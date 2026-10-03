@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+}
+
+enum PaymentStatus {
+  PENDING
+  SIMULATED
+  FAILED
+}
+
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(CUSTOMER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  orders       Order[]
+  reviews      Review[]
+  wishlist     Wishlist[]
+  cart         Cart?
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+
+  products    Product[]
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String   @db.Text
+  brand       String
+  price       Decimal  @db.Decimal(10, 2)
+  discount    Decimal  @default(0) @db.Decimal(5, 2)
+  stock       Int      @default(0)
+  rating      Decimal  @default(0) @db.Decimal(3, 2)
+  reviewCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  images      ProductImage[]
+  specs       ProductSpecification[]
+  reviews     Review[]
+  wishlisted  Wishlist[]
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+
+  @@index([categoryId])
+}
+
+model ProductImage {
+  id         String  @id @default(uuid())
+  url        String
+  altText    String?
+  sortOrder  Int     @default(0)
+
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model ProductSpecification {
+  id         String  @id @default(uuid())
+  key        String
+  value      String
+
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Wishlist {
+  id         String  @id @default(uuid())
+  
+  userId     String
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+model Cart {
+  id         String  @id @default(uuid())
+  
+  userId     String  @unique
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items      CartItem[]
+}
+
+model CartItem {
+  id         String  @id @default(uuid())
+  quantity   Int     @default(1)
+
+  cartId     String
+  cart       Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+model Order {
+  id              String        @id @default(uuid())
+  totalAmount     Decimal       @db.Decimal(10, 2)
+  shippingAddress String        @db.Text
+  paymentMethod   String
+  paymentStatus   PaymentStatus @default(PENDING)
+  orderStatus     OrderStatus   @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  items           OrderItem[]
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id          String  @id @default(uuid())
+  productName String
+  price       Decimal @db.Decimal(10, 2)
+  quantity    Int     @default(1)
+
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  rating     Int
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
